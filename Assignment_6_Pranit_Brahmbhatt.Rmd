@@ -1,0 +1,331 @@
+---
+title: "Assignment_6_Pranit_Brahmbhatt"
+author: "Pranit Brahmbhatt"
+date: "2024-04-06"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+header-includes:
+  - \usepackage{amssymb}
+  - \usepackage{fvextra}
+  - \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+## Installing and importing all the required libraries:
+
+```{r install libraries, tidy=TRUE, include=TRUE, warning=FALSE, message = FALSE}
+install.packages("stringr", repos = "http://cran.us.r-project.org")
+install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+install.packages("gridExtra", repos = "http://cran.us.r-project.org")
+```
+
+```{r import libraries, tidy=TRUE, include=TRUE, warning=FALSE, message = FALSE}
+library(tidyr)
+library(ggplot2)
+library(glmnet)
+library(dplyr)
+library(stringr)
+library(tokenizers)
+library(lubridate)
+library(tidyverse)
+library(readr)
+library(tidytext)
+library(gridExtra)
+```
+
+# Part A
+
+Problems 1–3 ask you to visualize tweets from @realDonaldTrump, as
+collected by <https://www.thetrumpar> chive.com. Download the data files
+from “twitter.zip” on Piazza.
+
+## Problem 1
+
+Import “realDonaldTrump-20201106.csv” making sure that the tweet IDs are
+preserved. Structure the tweets into a tidy text format using the
+token="regex" option. Process the data as follows:
+
+• Do not include re-tweets
+
+• Do not include tweets without any spaces
+
+• Remove stop words and the token “rt”
+
+• Remove stop words and “&amp”
+
+• Remove variations on Donald Trump’s name
+
+• Remove URLs and twitter @usernames
+
+• Replace all punctuation (EXCEPT for \#) with empty strings
+
+• Remove zero-length tokens (after applying above replacements)
+
+(Some special characters like emojis may get through this processing.
+This is acceptable.) Then visualize the top 20 most common terms in
+Donald Trump’s tweets.
+
+**Hint:** The regular expression [[:punct:]]+ can be used to match all
+punctuation. The str_replace_all() function may be helpful. There are
+many potential ways to accomplish the above preprocessing.
+
+### Solution:
+
+#### Importing the data-set:
+
+```{r import data, tidy=TRUE, include=TRUE, warning=FALSE, fig.align='center', message = FALSE}
+trump_tweets_data <- read_csv("realDonaldTrump-20201106.csv", col_types=cols(id=col_character()))
+as.tibble(trump_tweets_data)
+```
+
+#### Tidying the imported data-set by removing all the stop words and creating dataframe to plot the graph:
+
+```{r tidying, tidy=TRUE, include=TRUE, warning=FALSE, fig.align='center', message = FALSE}
+# Filter out retweets and tweets without spaces
+extra_stop_words <- c("realdonaldtrump", "donaldtrump",
+                     "donald", "trump", "amp", "t.co")
+
+tidy_tweets_data <- trump_tweets_data %>%
+  filter(!isRetweet, str_detect(text, "[:space:]")) %>%
+  select(id, text, retweets, date) %>%
+  unnest_tokens("word", text) %>%
+  anti_join(stop_words, by="word") %>%
+  filter(!word %in% extra_stop_words,
+         !str_detect(word, "http"),
+         !str_detect(word, "@"))
+```
+
+#### Plotting the graph to see the top 20 most common terms used in Donald Trump's tweets:
+
+```{r q1.1, fig.align='center', message=FALSE, warning=FALSE, include=TRUE, tidy=TRUE}
+tidy_tweets_data %>%
+  dplyr::count(word) %>%
+  top_n(20) %>%
+  ggplot(aes(x=reorder(word, n), y=n)) +  
+  geom_col(color = "black", fill = "blue") +  
+  coord_flip() +
+  labs(x="Term", y="Count",
+       title="Top terms in Donald Trump's tweets") +
+  theme_minimal()
+```
+
+
+
+## Problem 2
+
+Visualize the top 20 most common terms in Donald Trump’s tweets for each
+year from 2015-2020, and comment on the visualization.
+
+### Solution:
+
+
+#### Plotting the graph to see the top 20 most common terms used in Donald Trump's tweets for the years 2015-2020 by filtering the data for the given years:
+
+```{r q2.1, message=FALSE, fig.width=6, fig.height=6, fig.align='center', warning=FALSE, include=TRUE, tidy=TRUE}
+tidy_tweets_data %>%
+  mutate(year=year(date)) %>%
+  filter(year %in% 2015:2020) %>%
+  dplyr::count(word, year) %>%
+  group_by(year) %>%
+  top_n(10) %>%
+  ggplot(aes(x=reorder_within(word, n, year),
+             y=n, fill=factor(year))) +
+  geom_col(show.legend=FALSE) +
+  coord_flip() +
+  scale_x_reordered() +
+  scale_y_continuous(labels=NULL) +
+  scale_fill_manual(values = c("2015" = "red", "2016" = "blue", "2017" = "red", "2018" = "blue", "2019" = "red", "2020" = "blue")) +  # Set colors for each year
+  facet_wrap(~year, scales="free", ncol=2) +
+  labs(x="Term", y="Count",
+       title="Top terms in Trump's tweets by year") +
+  theme_minimal()
+```
+
+### Conclusion:
+
+1)  **From** **years 2015 to 2016**, Trump was running his Presidential
+    Campaign pre-elections and we can concur that:
+
+-   Trump frequently used "Make America Great Again (MAGA)": Emphasizes
+    Trump's focus on his campaign slogan, highlighting his nationalist
+    agenda.
+-   Trump did not hold back on targeting Hillary Clinton: Indicates
+    Trump's frequent criticism of his opponent, suggesting a contentious
+    campaign environment.
+-   Trump's mentioning Joe (President, Joe Biden) and anticipating his
+    upcoming opponent in the next elections: Implies Trump's
+    anticipation of his opponent in the 2020 election, reflecting his
+    strategy to contrast his policies with Biden's.
+
+2)  **From years 2017 to 2018**, Trump came in power as he was elected
+    as the POTUS. We can clearly see a diversion of his tweets from
+    "MAGA" to more about people, the job market, fake news, criticizing
+    democrats, and other political tweets involving the USA border
+    issues.
+
+3)  **From years 2019 to 2020**, we could again see Trump using words
+    like president, MAGA, people, and vote, as this was a pre-election
+    preparation for the 2020 elections. Moreover, we can see that Trump
+    used words "China" and "Biden" more frequently then, because of the
+    political tension with China around the time of COVID-19 and him
+    targeting his opponent; Joe Biden, who is running for the 2020
+    elections against Trump.
+
+# Part B
+
+Problems 4–5 ask you to fit and interpret a model to the tweets analyzed
+in Part A.
+
+## Problem 3
+
+Treat year as a “document” to calculate the tf-idf for each term and
+year. Visualize the top 20 most characteristic terms in Donald Trump’s
+tweets for each year from 2015-2020, and comment on the visualization.
+
+### Solution:
+
+#### Extract year from date column:
+
+```{r q3.1, message=FALSE, warning=FALSE, include=TRUE, tidy=TRUE}
+yearly_tweets_data <- tidy_tweets_data %>%
+  mutate(year=year(date)) %>%
+  filter(year %in% 2015:2020) %>%
+  dplyr::count(word, year) %>%
+  bind_tf_idf(word, year, n)
+```
+
+#### Filter data for years 2015-2020:
+
+```{r q3.2, message=FALSE, fig.width=6, fig.height=6, fig.align='center', warning=FALSE, include=TRUE, tidy=TRUE}
+yearly_tweets_data %>%
+  group_by(year) %>%
+  top_n(10, tf_idf) %>%
+  ggplot(aes(x=reorder_within(word, tf_idf, year),
+             y=tf_idf, fill=factor(year))) +
+  geom_col(show.legend=FALSE) +
+  coord_flip() +
+  scale_x_reordered() +
+  scale_y_continuous(labels=NULL) +
+  scale_fill_brewer(palette="Dark2") +
+  facet_wrap(~year, scales="free", ncol=2) +
+  labs(x="Term", y="tf-idf",title="Each year's characteristic terms from Trump's tweets") +
+theme_minimal()
+```
+
+
+### Conclusion:
+
+As we can see here, "MAGA (Make America Great Again)" and  "Trump2016" being 
+most tweeted phrases was not a surprise since 2015-16 was the election rally 
+time. Following years the policies which Trump brought were tweeted other than 
+Fake news, Trump used to call out fake news a lot in his tweets. To no ones 
+surprise Covid, Coronavirus were most talked about Trump in 2020.
+
+
+
+## Problem 4
+
+Filter the data to include only tweets from 2016-2020, and then use the
+glmnet package fit sparse regression models to predict the number of
+retweets that a tweet will get. Use cross-validation to select the
+sparsity parameter lambda. Report the selected value of lambda and the
+number of non-zero coefficients in the regression model. (You do not
+need to partition the dataset beforehand or report the error.)
+
+Hint: Use the rownames() and colnames() of the sparse matrix to extract
+the terms and IDs.
+
+### Solution:
+
+```{r q4.1, message=FALSE, warning=FALSE, include=TRUE, tidy=TRUE}
+trump_tenure_tweet_data <- tidy_tweets_data %>%
+  filter(year(date) >= 2016) %>%
+  dplyr::count(id, word) %>%
+  cast_sparse(id, word, n)
+
+dim(trump_tenure_tweet_data)
+```
+
+```{r q4.2, message=FALSE, warning=FALSE, include=TRUE, tidy=TRUE}
+trump_tenure_tweet_data[1:6, 1:6]
+```
+
+```{r q4.3, message=FALSE, warning=FALSE, include=TRUE, tidy=TRUE}
+trump_id_table <- tibble(id=rownames(trump_tenure_tweet_data))
+trump_id_table <- inner_join(trump_id_table, trump_tweets_data)
+trump_id_table
+```
+
+```{r q4.4, message=FALSE, warning=FALSE, include=TRUE, tidy=TRUE}
+trump_rt_data <- trump_id_table$retweets
+```
+
+```{r q4.5, message=FALSE, warning=FALSE, include=TRUE, tidy=TRUE}
+set.seed(2020)
+fit_cv <- cv.glmnet(trump_tenure_tweet_data, trump_rt_data)
+plot(fit_cv)
+```
+
+```{r q4.6, message=FALSE, warning=FALSE, include=TRUE, tidy=TRUE}
+fit_cv
+```
+
+
+
+## Problem 5
+
+Extract the coefficients from the best model from Problem 4, and
+visualize the terms with the strongest positive relationship with the
+number of re-tweets. Comment on the visualization.
+
+### Solution:
+
+```{r q5.1, message=FALSE, warning=FALSE, include=TRUE, tidy=TRUE}
+trump_coefs <- coef(fit_cv, s="lambda.min")
+trump_coefs <- tibble(word=rownames(trump_coefs),
+                     coef=as.numeric(trump_coefs))
+trump_coefs %>%
+  top_n(15) %>%
+  ggplot(aes(x=reorder(word, coef), y=coef)) +
+  geom_col() +
+  coord_flip() +
+  labs(x="Term", y="Regression Coefficient") +
+  theme_minimal()
+```
+
+```{r q5.2, message=FALSE, warning=FALSE, include=TRUE, tidy=TRUE}
+trump_lower_coefs <- trump_tweets_data %>%
+  filter(year(date) >= 2016) %>%
+  mutate(text=str_to_lower(text))
+```
+
+```{r q5.3, message=FALSE, warning=FALSE, include=TRUE, tidy=TRUE}
+trump_lower_coefs %>%
+  filter(str_detect(text, "#fnn")) %>%
+  select(date, text, retweets)
+```
+
+```{r q5.4, message=FALSE, warning=FALSE, include=TRUE, tidy=TRUE}
+trump_lower_coefs %>%
+  filter(str_detect(text, "starved")) %>%
+  select(date, text, retweets)
+```
+
+```{r q5.5, message=FALSE, warning=FALSE, include=TRUE, tidy=TRUE}
+trump_lower_coefs %>%
+  filter(str_detect(text, "weli")) %>%
+  select(date, text, retweets)
+```
+
+```{r q5.6, message=FALSE, warning=FALSE, include=TRUE, tidy=TRUE}
+trump_lower_coefs %>%
+  filter(str_detect(text, "quarantine")) %>%
+  select(date, text, retweets)
+```
+
+#### Conclusion:
+The re-tweets with the strongest regression coefficient contain "#fnn" 
+(Fox News Networks)
